@@ -33,7 +33,6 @@ class DashboardController extends Controller
         $totalKartuStok = DB::select("SELECT COUNT(*) as total FROM kartu_stok")[0]->total;
         $totalMargin = DB::select("SELECT COUNT(*) as total FROM margin_penjualan")[0]->total;
 
-
         $stats = [
             'user' => $totalUser,
             'role' => $totalRole,
@@ -48,7 +47,11 @@ class DashboardController extends Controller
             'margin' => $totalMargin
         ];
 
-        return view('superadmin.dashboard', compact('stats'));
+        // Tambahkan variabel tanggal untuk layout
+        $tanggalDari = date('Y-m-01'); // Awal bulan
+        $tanggalSampai = date('Y-m-d'); // Hari ini
+
+        return view('superadmin.dashboard', compact('stats', 'tanggalDari', 'tanggalSampai'));
     }
 
     // Dashboard Admin - Tampilan terbatas
@@ -79,6 +82,10 @@ class DashboardController extends Controller
             'kartu_stok' => $totalKartuStok
         ];
 
-        return view('admin.dashboard', compact('stats'));
+        // Tambahkan variabel tanggal untuk layout
+        $tanggalDari = date('Y-m-01'); // Awal bulan
+        $tanggalSampai = date('Y-m-d'); // Hari ini
+
+        return view('admin.dashboard', compact('stats', 'tanggalDari', 'tanggalSampai'));
     }
 }

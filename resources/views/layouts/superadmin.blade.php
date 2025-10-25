@@ -223,14 +223,14 @@
             <a href="{{ route('superadmin.margin.index') }}" class="{{ request()->routeIs('superadmin.margin.*') ? 'active' : '' }}">
                 <i class="fas fa-percentage"></i> Margin Penjualan
             </a>
-            <a href="#">
+            <a href="{{ route('superadmin.retur.index') }}" class="{{ request()->routeIs('superadmin.retur.*') ? 'active' : '' }}">
                 <i class="fas fa-undo"></i> Retur
             </a>
-            <a href="#">
+            <a href="{{ route('superadmin.kartuStok.index') }}" class="{{ request()->routeIs('superadmin.kartuStok.*') ? 'active' : '' }}">
                 <i class="fas fa-warehouse"></i> Kartu Stok
             </a>
-            <a href="#">
-                <i class="fas fa-chart-line"></i> Laporan
+            <a href="{{ route('superadmin.laporan.penjualan') }}" class="{{ request()->routeIs('superadmin.laporan.*') ? 'active' : '' }}">
+                <i class="fas fa-chart-line"></i> Laporan Penjualan
             </a>
         </div>
         
