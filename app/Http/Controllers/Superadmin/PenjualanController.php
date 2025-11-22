@@ -10,14 +10,13 @@ class PenjualanController extends Controller
 {
     /**
      * Display a listing of penjualan
+     * MENGGUNAKAN VIEW view_penjualan_all
      */
     public function index()
     {
         $penjualans = DB::select("
-            SELECT p.*, u.username
-            FROM penjualan p
-            JOIN user u ON p.iduser = u.iduser
-            ORDER BY p.created_at DESC
+            SELECT * FROM view_penjualan_all
+            ORDER BY created_at DESC
         ");
         
         return view('superadmin.penjualan.index', compact('penjualans'));
@@ -26,18 +25,23 @@ class PenjualanController extends Controller
     /**
      * Show the form for creating a new penjualan
      */
-    public function create()
+    public function create(Request $request)
     {
         // Ambil barang aktif yang ada stoknya
         $barangs = DB::select("
-            SELECT b.*, s.nama_satuan,
-                   IFNULL((
-                       SELECT stock 
-                       FROM kartu_stok 
-                       WHERE idbarang = b.idbarang 
-                       ORDER BY idkartu_stok DESC 
-                       LIMIT 1
-                   ), 0) as stok_tersedia
+            SELECT 
+                b.idbarang,
+                b.nama,
+                b.jenis,
+                b.harga,
+                s.nama_satuan,
+                IFNULL((
+                    SELECT stock 
+                    FROM kartu_stok 
+                    WHERE idbarang = b.idbarang 
+                    ORDER BY idkartu_stok DESC 
+                    LIMIT 1
+                ), 0) as stok_tersedia
             FROM barang b
             JOIN satuan s ON b.idsatuan = s.idsatuan
             WHERE b.status = 1
@@ -45,7 +49,23 @@ class PenjualanController extends Controller
             ORDER BY b.nama
         ");
         
-        return view('superadmin.penjualan.create', compact('barangs'));
+        // Ambil user dari session
+        $userId = $request->session()->get('user_id');
+        $currentUser = DB::selectOne(
+            "SELECT iduser, username FROM user WHERE iduser = ?", 
+            [$userId]
+        );
+        
+        // Ambil margin aktif (untuk info saja, SP yang akan pakai)
+        $marginAktif = DB::selectOne("
+            SELECT persen 
+            FROM margin_penjualan 
+            WHERE status = 1 
+            ORDER BY updated_at DESC 
+            LIMIT 1
+        ");
+        
+        return view('superadmin.penjualan.create', compact('barangs', 'currentUser', 'marginAktif'));
     }
 
     /**
@@ -53,14 +73,14 @@ class PenjualanController extends Controller
      */
     public function getHargaJual(Request $request)
     {
-        $idbarang = $request->idbarang;
-        
         try {
+            $idbarang = $request->idbarang;
+            
             // CALL FUNCTION (sudah termasuk margin!)
             $result = DB::select("SELECT fn_hitung_harga_jual(?) as harga_jual", [$idbarang]);
             
-            // Ambil stok
-            $stok = DB::select("
+            // Ambil stok dari kartu_stok
+            $stok = DB::selectOne("
                 SELECT IFNULL((
                     SELECT stock 
                     FROM kartu_stok 
@@ -72,8 +92,8 @@ class PenjualanController extends Controller
             
             return response()->json([
                 'success' => true,
-                'harga_jual' => $result[0]->harga_jual,
-                'stok_tersedia' => $stok[0]->stok
+                'harga_jual' => $result[0]->harga_jual ?? 0,
+                'stok_tersedia' => $stok->stok ?? 0
             ]);
             
         } catch (\Exception $e) {
@@ -86,6 +106,8 @@ class PenjualanController extends Controller
 
     /**
      * Store penjualan (PAKAI SP & TRIGGER!)
+     * SP: sp_insert_detail_penjualan
+     * TRIGGER: trg_after_insert_penjualan (update kartu_stok + stok barang)
      */
     public function store(Request $request)
     {
@@ -94,24 +116,53 @@ class PenjualanController extends Controller
             'barang' => 'required|array|min:1',
             'barang.*.idbarang' => 'required|exists:barang,idbarang',
             'barang.*.jumlah' => 'required|numeric|min:1',
+        ], [
+            'ppn.required' => 'PPN harus diisi',
+            'ppn.numeric' => 'PPN harus berupa angka',
+            'barang.required' => 'Minimal 1 barang harus ditambahkan',
+            'barang.*.idbarang.required' => 'ID Barang tidak valid',
+            'barang.*.idbarang.exists' => 'Barang tidak ditemukan',
+            'barang.*.jumlah.required' => 'Jumlah harus diisi',
+            'barang.*.jumlah.min' => 'Jumlah minimal 1',
         ]);
         
         DB::beginTransaction();
         
         try {
-            $iduser = auth()->user()->iduser;
+            // Ambil user dari session
+            $iduser = $request->session()->get('user_id') ?? 1;
             
-            // 1. Insert header penjualan (manual)
-            DB::insert("
-                INSERT INTO penjualan (created_at, subtotal_nilai, ppn, total_nilai, iduser)
-                VALUES (NOW(), 0, ?, 0, ?)
-            ", [$request->ppn, $iduser]);
+            // 1. Ambil margin aktif
+            $margin = DB::selectOne("
+                SELECT idmargin_penjualan 
+                FROM margin_penjualan 
+                WHERE status = 1 
+                ORDER BY updated_at DESC 
+                LIMIT 1
+            ");
             
-            $idpenjualan = DB::getPdo()->lastInsertId();
+            if (!$margin) {
+                throw new \Exception('Margin penjualan belum diatur. Silakan set margin terlebih dahulu.');
+            }
             
-            // 2. Insert detail menggunakan STORED PROCEDURE
-            // SP otomatis update subtotal & total
-            // TRIGGER otomatis kurangi stok!
+            // 2. Insert header penjualan
+            $idpenjualan = DB::table('penjualan')->insertGetId([
+                'created_at' => now(),
+                'subtotal_nilai' => 0,
+                'ppn' => $request->ppn,
+                'total_nilai' => 0,
+                'iduser' => $iduser,
+                'idmargin_penjualan' => $margin->idmargin_penjualan
+            ]);
+            
+            // 3. Insert detail menggunakan STORED PROCEDURE
+            // SP otomatis:
+            // - Validasi stok mencukupi
+            // - Hitung harga jual via fn_hitung_harga_jual()
+            // - Update subtotal & total di header
+            // TRIGGER otomatis:
+            // - Insert kartu_stok (jenis 'J')
+            // - Kurangi stok barang
             foreach ($request->barang as $item) {
                 DB::statement("CALL sp_insert_detail_penjualan(?, ?, ?)", [
                     $idpenjualan,
@@ -124,13 +175,15 @@ class PenjualanController extends Controller
             
             return redirect()
                 ->route('superadmin.penjualan.show', $idpenjualan)
-                ->with('success', 'Penjualan berhasil dibuat dan stok otomatis terupdate!');
+                ->with('success', 'Penjualan berhasil dibuat! Stok otomatis terupdate.');
                 
         } catch (\Exception $e) {
             DB::rollBack();
             
-            // Handle error stok tidak cukup
-            if (str_contains($e->getMessage(), 'Stok tidak mencukupi')) {
+            // Handle error spesifik
+            $errorMsg = $e->getMessage();
+            
+            if (str_contains($errorMsg, 'Stok tidak mencukupi')) {
                 return back()
                     ->withInput()
                     ->with('error', 'Stok barang tidak mencukupi untuk penjualan ini!');
@@ -138,32 +191,31 @@ class PenjualanController extends Controller
             
             return back()
                 ->withInput()
-                ->with('error', 'Gagal membuat penjualan: ' . $e->getMessage());
+                ->with('error', 'Gagal membuat penjualan: ' . $errorMsg);
         }
     }
 
     /**
      * Display the specified penjualan
+     * MENGGUNAKAN VIEW view_penjualan_all & view_detail_penjualan_all
      */
     public function show(string $id)
     {
+        // Ambil header dari view
         $penjualan = DB::selectOne("
-            SELECT p.*, u.username
-            FROM penjualan p
-            JOIN user u ON p.iduser = u.iduser
-            WHERE p.idpenjualan = ?
+            SELECT * FROM view_penjualan_all
+            WHERE idpenjualan = ?
         ", [$id]);
         
         if (!$penjualan) {
-            abort(404);
+            abort(404, 'Penjualan tidak ditemukan');
         }
         
+        // Ambil detail dari view (sudah include keuntungan per item)
         $details = DB::select("
-            SELECT dp.*, b.nama as nama_barang, s.nama_satuan
-            FROM detail_penjualan dp
-            JOIN barang b ON dp.idbarang = b.idbarang
-            JOIN satuan s ON b.idsatuan = s.idsatuan
-            WHERE dp.penjualan_idpenjualan = ?
+            SELECT * FROM view_detail_penjualan_all
+            WHERE penjualan_idpenjualan = ?
+            ORDER BY iddetail_penjualan ASC
         ", [$id]);
         
         return view('superadmin.penjualan.show', compact('penjualan', 'details'));
@@ -177,37 +229,48 @@ class PenjualanController extends Controller
         DB::beginTransaction();
         
         try {
+            // Cek penjualan exists
+            $penjualan = DB::selectOne("
+                SELECT idpenjualan FROM penjualan WHERE idpenjualan = ?
+            ", [$id]);
+            
+            if (!$penjualan) {
+                throw new \Exception('Penjualan tidak ditemukan');
+            }
+            
             // Cek apakah sudah ada retur
             $hasRetur = DB::selectOne("
-                SELECT COUNT(*) as total FROM retur WHERE idpenjualan = ?
+                SELECT COUNT(*) as total 
+                FROM retur 
+                WHERE idpenjualan = ?
             ", [$id]);
             
             if ($hasRetur->total > 0) {
-                return back()->with('error', 'Penjualan tidak dapat dihapus karena sudah ada retur');
+                throw new \Exception('Penjualan tidak dapat dihapus karena sudah ada retur!');
             }
             
-            // Hapus kartu_stok (jenis transaksi 'J' = Jual)
+            // 1. Hapus kartu_stok (jenis transaksi 'J' = Jual)
             DB::delete("
                 DELETE FROM kartu_stok 
                 WHERE jenis_transaksi = 'J' 
                 AND idtransaksi = ?
             ", [$id]);
             
-            // Hapus detail
+            // 2. Hapus detail penjualan
             DB::delete("DELETE FROM detail_penjualan WHERE penjualan_idpenjualan = ?", [$id]);
             
-            // Hapus header
+            // 3. Hapus header penjualan
             DB::delete("DELETE FROM penjualan WHERE idpenjualan = ?", [$id]);
             
             DB::commit();
             
             return redirect()
                 ->route('superadmin.penjualan.index')
-                ->with('success', 'Penjualan berhasil dihapus');
+                ->with('success', 'Penjualan berhasil dihapus!');
                 
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Gagal menghapus: ' . $e->getMessage());
+            return back()->with('error', 'Gagal menghapus penjualan: ' . $e->getMessage());
         }
     }
 }

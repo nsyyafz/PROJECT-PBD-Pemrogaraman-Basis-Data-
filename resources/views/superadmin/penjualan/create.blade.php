@@ -1,14 +1,14 @@
 @extends('layouts.metis.app')
 
-@section('title', 'Buat Pengadaan Baru')
+@section('title', 'Buat Penjualan Baru')
 
 @php
-    $pageTitle = 'Buat Pengadaan Baru';
-    $pageDescription = 'Form pembuatan pengadaan barang dari vendor';
+    $pageTitle = 'Buat Penjualan Baru';
+    $pageDescription = 'Form penjualan barang';
 @endphp
 
 @section('page-actions')
-<a href="{{ route('superadmin.pengadaan.index') }}" class="btn btn-secondary btn-sm">
+<a href="{{ route('superadmin.penjualan.index') }}" class="btn btn-secondary btn-sm">
     <i class="bi bi-arrow-left me-1"></i> Kembali
 </a>
 @endsection
@@ -35,34 +35,18 @@
     </div>
 @endif
 
-<form action="{{ route('superadmin.pengadaan.store') }}" method="POST" id="formPengadaan">
+<form action="{{ route('superadmin.penjualan.store') }}" method="POST" id="formPenjualan">
     @csrf
     
     <!-- Info Header Card -->
     <div class="card mb-3">
         <div class="card-header py-2">
             <h6 class="card-title mb-0">
-                <i class="bi bi-info-circle me-2"></i>Informasi Pengadaan
+                <i class="bi bi-info-circle me-2"></i>Informasi Penjualan
             </h6>
         </div>
         <div class="card-body">
             <div class="row g-2">
-                <!-- Vendor -->
-                <div class="col-md-3">
-                    <label class="form-label form-label-sm">Vendor <span class="text-danger">*</span></label>
-                    <select name="vendor_idvendor" id="vendor_idvendor" class="form-select form-select-sm" required>
-                        <option value="">-- Pilih Vendor --</option>
-                        @foreach($vendors as $vendor)
-                            <option value="{{ $vendor->idvendor }}" {{ old('vendor_idvendor') == $vendor->idvendor ? 'selected' : '' }}>
-                                {{ $vendor->nama_vendor }} ({{ $vendor->badan_hukum }})
-                            </option>
-                        @endforeach
-                    </select>
-                    @error('vendor_idvendor')
-                        <div class="text-danger small">{{ $message }}</div>
-                    @enderror
-                </div>
-
                 <!-- User (Auto) -->
                 <div class="col-md-2">
                     <label class="form-label form-label-sm">
@@ -79,12 +63,12 @@
                     <input type="text" class="form-control form-control-sm" value="{{ now()->format('d/m/Y H:i') }}" readonly>
                 </div>
 
-                <!-- Status (Auto) -->
+                <!-- Margin Aktif (Info) -->
                 <div class="col-md-2">
                     <label class="form-label form-label-sm">
-                        Status <span class="badge bg-secondary" style="font-size: 0.6rem;">AUTO</span>
+                        Margin Aktif <span class="badge bg-info" style="font-size: 0.6rem;">INFO</span>
                     </label>
-                    <input type="text" class="form-control form-control-sm" value="Diproses (D)" readonly>
+                    <input type="text" class="form-control form-control-sm" value="{{ $marginAktif->persen ?? 0 }}%" readonly>
                 </div>
 
                 <!-- PPN (Fixed) -->
@@ -99,13 +83,19 @@
                     <label class="form-label form-label-sm">Subtotal</label>
                     <input type="text" id="display_subtotal" class="form-control form-control-sm fw-bold text-primary" value="Rp 0" readonly>
                 </div>
+
+                <!-- Total -->
+                <div class="col-md-3">
+                    <label class="form-label form-label-sm">Total + PPN</label>
+                    <input type="text" id="display_total" class="form-control form-control-sm fw-bold text-success" style="font-size: 1rem;" value="Rp 0" readonly>
+                </div>
             </div>
 
             <div class="row g-2 mt-1">
-                <!-- Nilai PPN -->
+                <!-- Keuntungan -->
                 <div class="col-md-2 offset-md-10">
-                    <label class="form-label form-label-sm">Total + PPN</label>
-                    <input type="text" id="display_total" class="form-control form-control-sm fw-bold text-success" style="font-size: 1rem;" value="Rp 0" readonly>
+                    <label class="form-label form-label-sm">Keuntungan</label>
+                    <input type="text" id="display_keuntungan" class="form-control form-control-sm fw-bold text-warning" style="font-size: 1rem;" value="Rp 0" readonly>
                 </div>
             </div>
         </div>
@@ -123,14 +113,16 @@
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-bordered table-sm mb-0" id="tableBarang" style="font-size: 0.85rem;">
+                <table class="table table-bordered table-sm mb-0" id="tableBarang" style="font-size: 0.8rem;">
                     <thead class="table-light">
                         <tr>
-                            <th style="width: 40px;" class="text-center">No</th>
+                            <th style="width: 35px;" class="text-center">No</th>
                             <th>Barang</th>
-                            <th style="width: 140px;">Harga Satuan</th>
-                            <th style="width: 100px;">Jumlah</th>
-                            <th style="width: 140px;">Subtotal</th>
+                            <th style="width: 80px;" class="text-center">Stok</th>
+                            <th style="width: 110px;" class="text-end">Harga Jual</th>
+                            <th style="width: 100px;" class="text-center">Jumlah</th>
+                            <th style="width: 110px;" class="text-end">Subtotal</th>
+                            <th style="width: 110px;" class="text-end">Keuntungan</th>
                             <th style="width: 70px;" class="text-center">Aksi</th>
                         </tr>
                     </thead>
@@ -139,18 +131,21 @@
                     </tbody>
                     <tfoot>
                         <tr class="table-secondary">
-                            <td colspan="4" class="text-end"><strong>Subtotal:</strong></td>
-                            <td><strong id="displaySubtotal">Rp 0</strong></td>
+                            <td colspan="5" class="text-end"><strong>Subtotal:</strong></td>
+                            <td class="text-end"><strong id="displaySubtotal">Rp 0</strong></td>
+                            <td class="text-end"><strong id="displayKeuntungan">Rp 0</strong></td>
                             <td></td>
                         </tr>
                         <tr class="table-secondary">
-                            <td colspan="4" class="text-end"><strong>PPN (10%):</strong></td>
-                            <td><strong id="displayNilaiPPN">Rp 0</strong></td>
+                            <td colspan="5" class="text-end"><strong>PPN (10%):</strong></td>
+                            <td class="text-end"><strong id="displayNilaiPPN">Rp 0</strong></td>
+                            <td></td>
                             <td></td>
                         </tr>
-                        <tr class="table-primary">
-                            <td colspan="4" class="text-end"><strong>TOTAL:</strong></td>
-                            <td><strong id="displayTotal" class="text-success">Rp 0</strong></td>
+                        <tr class="table-success">
+                            <td colspan="5" class="text-end"><strong>TOTAL:</strong></td>
+                            <td class="text-end"><strong id="displayTotal" class="text-success">Rp 0</strong></td>
+                            <td class="text-end"><strong id="displayTotalKeuntungan" class="text-warning">Rp 0</strong></td>
                             <td></td>
                         </tr>
                     </tfoot>
@@ -166,9 +161,9 @@
                 </div>
                 <div>
                     <button type="submit" class="btn btn-primary btn-sm">
-                        <i class="bi bi-save me-1"></i> Simpan Pengadaan
+                        <i class="bi bi-save me-1"></i> Simpan Penjualan
                     </button>
-                    <a href="{{ route('superadmin.pengadaan.index') }}" class="btn btn-secondary btn-sm">
+                    <a href="{{ route('superadmin.penjualan.index') }}" class="btn btn-secondary btn-sm">
                         <i class="bi bi-x-circle me-1"></i> Batal
                     </a>
                 </div>
@@ -183,6 +178,7 @@
 // Data barang dari server
 const barangData = @json($barangs);
 let rowCounter = 0;
+const marginPersen = {{ $marginAktif->persen ?? 0 }};
 
 // Tambah baris barang baru
 function addBarangRow() {
@@ -193,18 +189,25 @@ function addBarangRow() {
             <td>
                 <select name="barang[${rowCounter}][idbarang]" class="form-select form-select-sm barang-select" data-row="${rowCounter}" required>
                     <option value="">-- Pilih Barang --</option>
-                    ${barangData.map(b => `<option value="${b.idbarang}" data-harga="${b.harga}">${b.nama_barang} (${b.nama_satuan})</option>`).join('')}
+                    ${barangData.map(b => `<option value="${b.idbarang}" data-harga="${b.harga}" data-stok="${b.stok_tersedia}">${b.nama} (${b.nama_satuan})</option>`).join('')}
                 </select>
+            </td>
+            <td class="text-center">
+                <span class="badge bg-info stok-display" data-row="${rowCounter}">0</span>
             </td>
             <td>
                 <input type="text" class="form-control form-control-sm text-end harga-display" data-row="${rowCounter}" readonly value="Rp 0">
                 <input type="hidden" class="harga-value" data-row="${rowCounter}" value="0">
+                <input type="hidden" class="harga-modal" data-row="${rowCounter}" value="0">
             </td>
             <td>
-                <input type="number" name="barang[${rowCounter}][jumlah]" class="form-control form-control-sm text-center jumlah-input" data-row="${rowCounter}" min="1" value="1" required>
+                <input type="number" name="barang[${rowCounter}][jumlah]" class="form-control form-control-sm text-center jumlah-input" data-row="${rowCounter}" min="1" max="0" value="1" required>
             </td>
             <td>
                 <input type="text" class="form-control form-control-sm text-end subtotal-display" data-row="${rowCounter}" readonly value="Rp 0">
+            </td>
+            <td>
+                <input type="text" class="form-control form-control-sm text-end keuntungan-display" data-row="${rowCounter}" readonly value="Rp 0">
             </td>
             <td class="text-center">
                 <button type="button" class="btn btn-danger btn-sm" onclick="removeBarangRow(${rowCounter})">
@@ -240,10 +243,21 @@ function attachEventListeners(rowId) {
     const selectBarang = document.querySelector(`select[data-row="${rowId}"]`);
     selectBarang.addEventListener('change', function() {
         const selectedOption = this.options[this.selectedIndex];
-        const harga = parseFloat(selectedOption.dataset.harga) || 0;
+        const hargaModal = parseFloat(selectedOption.dataset.harga) || 0;
+        const stok = parseInt(selectedOption.dataset.stok) || 0;
         
-        document.querySelector(`.harga-display[data-row="${rowId}"]`).value = formatRupiah(harga);
-        document.querySelector(`.harga-value[data-row="${rowId}"]`).value = harga;
+        // Hitung harga jual (harga modal + margin)
+        const hargaJual = Math.floor(hargaModal * (1 + marginPersen / 100));
+        
+        document.querySelector(`.stok-display[data-row="${rowId}"]`).textContent = stok;
+        document.querySelector(`.harga-display[data-row="${rowId}"]`).value = formatRupiah(hargaJual);
+        document.querySelector(`.harga-value[data-row="${rowId}"]`).value = hargaJual;
+        document.querySelector(`.harga-modal[data-row="${rowId}"]`).value = hargaModal;
+        
+        // Set max jumlah
+        const inputJumlah = document.querySelector(`.jumlah-input[data-row="${rowId}"]`);
+        inputJumlah.max = stok;
+        inputJumlah.value = stok > 0 ? 1 : 0;
         
         calculateRowSubtotal(rowId);
     });
@@ -257,11 +271,14 @@ function attachEventListeners(rowId) {
 
 // Hitung subtotal per baris
 function calculateRowSubtotal(rowId) {
-    const harga = parseFloat(document.querySelector(`.harga-value[data-row="${rowId}"]`).value) || 0;
+    const hargaJual = parseFloat(document.querySelector(`.harga-value[data-row="${rowId}"]`).value) || 0;
+    const hargaModal = parseFloat(document.querySelector(`.harga-modal[data-row="${rowId}"]`).value) || 0;
     const jumlah = parseInt(document.querySelector(`.jumlah-input[data-row="${rowId}"]`).value) || 0;
-    const subtotal = harga * jumlah;
+    const subtotal = hargaJual * jumlah;
+    const keuntungan = (hargaJual - hargaModal) * jumlah;
     
     document.querySelector(`.subtotal-display[data-row="${rowId}"]`).value = formatRupiah(subtotal);
+    document.querySelector(`.keuntungan-display[data-row="${rowId}"]`).value = formatRupiah(keuntungan);
     
     calculateTotal();
 }
@@ -269,11 +286,16 @@ function calculateRowSubtotal(rowId) {
 // Hitung total keseluruhan
 function calculateTotal() {
     let subtotal = 0;
+    let totalKeuntungan = 0;
     
-    // Sum semua subtotal
-    document.querySelectorAll('.subtotal-display').forEach(input => {
+    // Sum semua subtotal dan keuntungan
+    document.querySelectorAll('.subtotal-display').forEach((input, index) => {
         const value = parseFloat(input.value.replace(/[^0-9]/g, '')) || 0;
         subtotal += value;
+        
+        const keuntunganInput = document.querySelectorAll('.keuntungan-display')[index];
+        const keuntungan = parseFloat(keuntunganInput.value.replace(/[^0-9]/g, '')) || 0;
+        totalKeuntungan += keuntungan;
     });
     
     const ppnPersen = 10;
@@ -284,10 +306,13 @@ function calculateTotal() {
     document.getElementById('displaySubtotal').textContent = formatRupiah(subtotal);
     document.getElementById('displayNilaiPPN').textContent = formatRupiah(nilaiPPN);
     document.getElementById('displayTotal').textContent = formatRupiah(total);
+    document.getElementById('displayKeuntungan').textContent = formatRupiah(totalKeuntungan);
+    document.getElementById('displayTotalKeuntungan').textContent = formatRupiah(totalKeuntungan);
     
     // Update header form
     document.getElementById('display_subtotal').value = formatRupiah(subtotal);
     document.getElementById('display_total').value = formatRupiah(total);
+    document.getElementById('display_keuntungan').value = formatRupiah(totalKeuntungan);
 }
 
 // Format rupiah

@@ -14,8 +14,7 @@ class BarangController extends Controller
     public function index(Request $request)
     {
         // Ambil parameter filter dari query string (default: all)
-        $filter = $request->get('status', 'all');
-        
+        $filter = $request->get('status', 'aktif'); // ← ganti jadi 'aktif'        
         // Query berdasarkan filter
         if ($filter == 'aktif') {
             // Filter: hanya yang aktif
@@ -73,10 +72,16 @@ class BarangController extends Controller
         ]);
         
         try {
+            // Cari ID terbesar dan tambah 1
+            $maxId = DB::select("SELECT COALESCE(MAX(idbarang), 0) as max_id FROM barang");
+            $newId = $maxId[0]->max_id + 1;
+            
+            // Insert dengan ID manual
             DB::insert("
-                INSERT INTO barang (jenis, nama, idsatuan, harga, status)
-                VALUES (?, ?, ?, ?, 1)
+                INSERT INTO barang (idbarang, jenis, nama, idsatuan, harga, status)
+                VALUES (?, ?, ?, ?, ?, 1)
             ", [
+                $newId,
                 $request->jenis,
                 $request->nama,
                 $request->idsatuan,
@@ -85,7 +90,7 @@ class BarangController extends Controller
             
             return redirect()
                 ->route('superadmin.barang.index')
-                ->with('success', 'Barang berhasil ditambahkan');
+                ->with('success', 'Barang berhasil ditambahkan dengan ID: ' . $newId);
                 
         } catch (\Exception $e) {
             return back()

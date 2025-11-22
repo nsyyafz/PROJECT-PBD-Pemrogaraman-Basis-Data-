@@ -27,6 +27,15 @@ Auth::routes();
 Route::middleware(['isSuperadmin'])->prefix('superadmin')->name('superadmin.')->group(function () {
     // Dashboard
     Route::get('/dashboard', [DashboardSuperadminController::class, 'index'])->name('dashboard');
+     // AJAX Endpoints
+    Route::get('/dashboard/activity-by-date', [DashboardSuperadminController::class, 'getActivityByDate'])
+        ->name('dashboard.activity-by-date');
+    
+    Route::get('/dashboard/activity-by-type', [DashboardSuperadminController::class, 'getActivityByType'])
+        ->name('dashboard.activity-by-type');
+    
+    Route::get('/dashboard/weekly-stats', [DashboardSuperadminController::class, 'getWeeklyStats'])
+        ->name('dashboard.weekly-stats');
     
     // User Management
     Route::get('/user', [UserController::class, 'index'])->name('user.index');
@@ -76,15 +85,14 @@ Route::middleware(['isSuperadmin'])->prefix('superadmin')->name('superadmin.')->
     Route::get('/pengadaan/create', [PengadaanController::class, 'create'])->name('pengadaan.create');
     Route::post('/pengadaan', [PengadaanController::class, 'store'])->name('pengadaan.store');
     Route::get('/pengadaan/{id}', [PengadaanController::class, 'show'])->name('pengadaan.show');
-    Route::patch('/pengadaan/{id}/update-status', [PengadaanController::class, 'updateStatus'])->name('pengadaan.updateStatus');
     Route::get('/pengadaan/{id}/edit', [PengadaanController::class, 'edit'])->name('pengadaan.edit');
     Route::put('/pengadaan/{id}', [PengadaanController::class, 'update'])->name('pengadaan.update');
     Route::delete('/pengadaan/{id}', [PengadaanController::class, 'destroy'])->name('pengadaan.destroy');
     
     // Penerimaan Management
     Route::get('/penerimaan', [PenerimaanController::class, 'index'])->name('penerimaan.index');
-    Route::post('/penerimaan/ajax/get-preview-pengadaan', [PenerimaanController::class, 'getDetailPengadaan'])
-        ->name('penerimaan.getDetailPengadaan');
+    Route::get('penerimaan/get-detail-pengadaan', [PenerimaanController::class, 'getDetailPengadaan'])
+        ->name('penerimaan.get-detail-pengadaan');
     Route::get('/penerimaan/create', [PenerimaanController::class, 'create'])->name('penerimaan.create');
     Route::post('/penerimaan', [PenerimaanController::class, 'store'])->name('penerimaan.store');
     Route::get('/penerimaan/{id}', [PenerimaanController::class, 'show'])->name('penerimaan.show');
@@ -94,11 +102,14 @@ Route::middleware(['isSuperadmin'])->prefix('superadmin')->name('superadmin.')->
     
     // Penjualan Management
     Route::get('/penjualan', [PenjualanController::class, 'index'])->name('penjualan.index');
+    Route::get('penjualan/get-harga-jual', [PenjualanController::class, 'getHargaJual'])
+        ->name('penjualan.get-harga-jual');
     Route::get('/penjualan/create', [PenjualanController::class, 'create'])->name('penjualan.create');
     Route::post('/penjualan', [PenjualanController::class, 'store'])->name('penjualan.store');
     Route::get('/penjualan/{id}/edit', [PenjualanController::class, 'edit'])->name('penjualan.edit');
-    Route::put('/penjualan/{id}', [PenjualanController::class, 'update'])->name('penjualan.update');
+    Route::get('/penjualan/{id}', [PenjualanController::class, 'show'])->name('penjualan.show');
     Route::delete('/penjualan/{id}', [PenjualanController::class, 'destroy'])->name('penjualan.destroy');
+
     
     // Retur Management
     Route::get('/retur', [ReturController::class, 'index'])->name('retur.index');
@@ -109,7 +120,7 @@ Route::middleware(['isSuperadmin'])->prefix('superadmin')->name('superadmin.')->
     Route::delete('/retur/{id}', [ReturController::class, 'destroy'])->name('retur.destroy');
     
     // Kartu Stok
-    Route::get('/kartu-stok', [KartuStokController::class, 'index'])->name('kartuStok.index');
+    Route::get('/kartu-stok', [KartuStokController::class, 'index'])->name('kartu-stok.index');
     
     // Margin Penjualan
     Route::get('/margin', [MarginController::class, 'index'])->name('margin.index');

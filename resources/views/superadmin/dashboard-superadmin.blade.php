@@ -1,358 +1,647 @@
-@extends('layouts.superadmin')
+{{-- resources/views/superadmin/dashboard-superadmin.blade.php --}}
+@extends('layouts.metis.app')
 
-@section('title', 'Dashboard SuperAdmin - Sistem Inventory')
+@section('title', 'Dashboard SuperAdmin')
 
-@section('content')
 @php
     $pageTitle = 'Dashboard SuperAdmin';
-    $pageIcon = 'fa-chart-pie';
+    $pageDescription = 'Selamat datang kembali! Berikut ringkasan sistem periode ' . date('d M Y', strtotime($tanggalDari)) . ' - ' . date('d M Y', strtotime($tanggalSampai));
 @endphp
 
-<style>
-    .dashboard-header {
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-        border-radius: 12px;
-        padding: 2rem 2.5rem;
-        margin-bottom: 2rem;
-        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.15);
-    }
-
-    .dashboard-header h2 {
-        color: white;
-        font-size: 28px;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-    }
-
-    .dashboard-header p {
-        color: rgba(255, 255, 255, 0.9);
-        font-size: 15px;
-        margin: 0;
-    }
-
-    .stat-card {
-        border: none;
-        border-radius: 10px;
-        transition: all 0.3s ease;
-        height: 100%;
-        overflow: hidden;
-    }
-
-    .stat-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
-    }
-
-    .stat-card .card-body {
-        padding: 1.75rem;
-    }
-
-    .stat-card h6 {
-        font-size: 13px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 0.75rem;
-    }
-
-    .stat-card h2 {
-        font-size: 32px;
-        font-weight: 700;
-        margin: 0;
-        line-height: 1;
-    }
-
-    .stat-card h3 {
-        font-size: 20px;
-        font-weight: 600;
-    }
-
-    .stat-card i {
-        opacity: 0.25;
-        transition: all 0.3s ease;
-    }
-
-    .stat-card:hover i {
-        opacity: 0.4;
-        transform: scale(1.1);
-    }
-
-    /* Classic Color Palette */
-    .card-blue {
-        background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-        color: white;
-    }
-
-    .card-navy {
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-        color: white;
-    }
-
-    .card-teal {
-        background: linear-gradient(135deg, #16a085 0%, #1abc9c 100%);
-        color: white;
-    }
-
-    .card-orange {
-        background: linear-gradient(135deg, #e67e22 0%, #f39c12 100%);
-        color: white;
-    }
-
-    .card-purple {
-        background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
-        color: white;
-    }
-
-    .card-red {
-        background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%);
-        color: white;
-    }
-
-    .card-green {
-        background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
-        color: white;
-    }
-
-    .card-indigo {
-        background: linear-gradient(135deg, #2c3e91 0%, #3742fa 100%);
-        color: white;
-    }
-
-    .card-white {
-        background: white;
-        border: 1px solid #e8eaed;
-    }
-
-    .card-white h2 {
-        color: #2c3e50;
-    }
-
-    .card-white h6 {
-        color: #7f8c8d;
-    }
-
-    .card-white i {
-        color: #bdc3c7;
-    }
-
-    .card-crown {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .card-crown::before {
-        content: '';
-        position: absolute;
-        top: -50%;
-        right: -20%;
-        width: 200px;
-        height: 200px;
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 50%;
-    }
-
-    .section-divider {
-        margin: 2.5rem 0;
-        border-top: 2px solid #ecf0f1;
-    }
-
-    @media (max-width: 768px) {
-        .dashboard-header {
-            padding: 1.5rem;
-        }
-
-        .dashboard-header h2 {
-            font-size: 22px;
-        }
-
-        .stat-card h2 {
-            font-size: 26px;
-        }
-    }
-</style>
-
-<!-- Welcome Card -->
-<div class="dashboard-header">
-    <h2>👋 Selamat Datang, SuperAdmin</h2>
-    <p>Berikut adalah ringkasan data lengkap sistem inventory Anda</p>
+@section('page-actions')
+<div class="d-flex gap-2">
+    <button type="button" class="btn btn-outline-secondary" 
+            onclick="window.location.reload()"
+            data-bs-toggle="tooltip" 
+            title="Refresh data">
+        <i class="bi bi-arrow-clockwise icon-hover"></i>
+    </button>
+    <div class="dropdown">
+        <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+            <i class="bi bi-plus-lg me-2"></i>
+            Tambah Data
+        </button>
+        <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="{{ route('superadmin.barang.create') }}">
+                <i class="bi bi-box me-2"></i>Tambah Barang
+            </a></li>
+            <li><a class="dropdown-item" href="{{ route('superadmin.user.create') }}">
+                <i class="bi bi-person me-2"></i>Tambah User
+            </a></li>
+            <li><a class="dropdown-item" href="{{ route('superadmin.vendor.create') }}">
+                <i class="bi bi-truck me-2"></i>Tambah Vendor
+            </a></li>
+        </ul>
+    </div>
 </div>
+@endsection
 
-<!-- Stats Row 1: System Management -->
+@section('content')
+<!-- Stats Section: System Management -->
+<h5 class="fw-bold text-muted text-uppercase mb-3" style="font-size: 12px; letter-spacing: 1px;">
+    <i class="bi bi-gear me-2"></i>System Management
+</h5>
+
 <div class="row g-4 mb-4">
-    <div class="col-md-3">
-        <div class="stat-card card card-blue shadow-sm">
+    <div class="col-xl-3 col-lg-6">
+        <div class="card stats-card">
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6>Total User</h6>
-                        <h2>{{ $stats['user'] }}</h2>
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="stats-icon bg-primary bg-opacity-10 text-primary">
+                            <i class="bi bi-people"></i>
+                        </div>
                     </div>
-                    <i class="fas fa-users fa-3x"></i>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-0 text-muted">Total Users</h6>
+                        <h3 class="mb-0">{{ number_format($stats['user']) }}</h3>
+                        <small class="text-primary">
+                            <i class="bi bi-arrow-up"></i> Active
+                        </small>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="stat-card card card-navy shadow-sm">
+    <div class="col-xl-3 col-lg-6">
+        <div class="card stats-card">
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6>Total Role</h6>
-                        <h2>{{ $stats['role'] }}</h2>
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="stats-icon bg-info bg-opacity-10 text-info">
+                            <i class="bi bi-person-badge"></i>
+                        </div>
                     </div>
-                    <i class="fas fa-user-tag fa-3x"></i>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-0 text-muted">Total Role</h6>
+                        <h3 class="mb-0">{{ number_format($stats['role']) }}</h3>
+                        <small class="text-info">
+                            <i class="bi bi-shield-check"></i> Secured
+                        </small>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="stat-card card card-teal shadow-sm">
+    <div class="col-xl-3 col-lg-6">
+        <div class="card stats-card">
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6>Total Barang</h6>
-                        <h2>{{ $stats['barang'] }}</h2>
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="stats-icon bg-success bg-opacity-10 text-success">
+                            <i class="bi bi-box"></i>
+                        </div>
                     </div>
-                    <i class="fas fa-boxes fa-3x"></i>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-0 text-muted">Total Barang</h6>
+                        <h3 class="mb-0">{{ number_format($stats['barang']) }}</h3>
+                        <small class="text-success">
+                            <i class="bi bi-arrow-up"></i> In Stock
+                        </small>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="stat-card card card-orange shadow-sm">
+    <div class="col-xl-3 col-lg-6">
+        <div class="card stats-card">
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6>Total Vendor</h6>
-                        <h2>{{ $stats['vendor'] }}</h2>
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="stats-icon bg-warning bg-opacity-10 text-warning">
+                            <i class="bi bi-truck"></i>
+                        </div>
                     </div>
-                    <i class="fas fa-truck fa-3x"></i>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-0 text-muted">Total Vendor</h6>
+                        <h3 class="mb-0">{{ number_format($stats['vendor']) }}</h3>
+                        <small class="text-warning">
+                            <i class="bi bi-handshake"></i> Partner
+                        </small>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Stats Row 2: Transaction Management -->
+<!-- Stats Section: Transaction Management -->
+<h5 class="fw-bold text-muted text-uppercase mb-3 mt-4" style="font-size: 12px; letter-spacing: 1px;">
+    <i class="bi bi-arrow-left-right me-2"></i>Transaction Management
+</h5>
+
 <div class="row g-4 mb-4">
-    <div class="col-md-3">
-        <div class="stat-card card card-purple shadow-sm">
+    <div class="col-xl-3 col-lg-6">
+        <div class="card stats-card">
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6>Total Pengadaan</h6>
-                        <h2>{{ $stats['pengadaan'] }}</h2>
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="stats-icon bg-primary bg-opacity-10 text-primary">
+                            <i class="bi bi-cart-plus"></i>
+                        </div>
                     </div>
-                    <i class="fas fa-shopping-cart fa-3x"></i>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-0 text-muted">Pengadaan</h6>
+                        <h3 class="mb-0">{{ number_format($stats['pengadaan']) }}</h3>
+                        <small class="text-primary d-block">
+                            Selesai: {{ number_format($detailStats['pengadaan']['selesai']) }} | 
+                            Proses: {{ number_format($detailStats['pengadaan']['diproses']) }}
+                        </small>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="stat-card card card-indigo shadow-sm">
+    <div class="col-xl-3 col-lg-6">
+        <div class="card stats-card">
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6>Total Penerimaan</h6>
-                        <h2>{{ $stats['penerimaan'] }}</h2>
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="stats-icon bg-info bg-opacity-10 text-info">
+                            <i class="bi bi-inbox"></i>
+                        </div>
                     </div>
-                    <i class="fas fa-inbox fa-3x"></i>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-0 text-muted">Penerimaan</h6>
+                        <h3 class="mb-0">{{ number_format($stats['penerimaan']) }}</h3>
+                        <small class="text-info d-block">
+                            Hari Ini: {{ number_format($detailStats['penerimaan']['penerimaan_hari_ini']) }} | 
+                            Bulan: {{ number_format($detailStats['penerimaan']['penerimaan_bulan_ini']) }}
+                        </small>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="stat-card card card-green shadow-sm">
+    <div class="col-xl-3 col-lg-6">
+        <div class="card stats-card">
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6>Total Penjualan</h6>
-                        <h2>{{ $stats['penjualan'] }}</h2>
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="stats-icon bg-success bg-opacity-10 text-success">
+                            <i class="bi bi-cart-check"></i>
+                        </div>
                     </div>
-                    <i class="fas fa-cash-register fa-3x"></i>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-0 text-muted">Penjualan</h6>
+                        <h3 class="mb-0">{{ number_format($stats['penjualan']) }}</h3>
+                        <small class="text-success d-block">
+                            <i class="bi bi-currency-dollar"></i> 
+                            Rp {{ number_format($detailStats['penjualan']['total_nilai'], 0, ',', '.') }}
+                        </small>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="stat-card card card-red shadow-sm">
+    <div class="col-xl-3 col-lg-6">
+        <div class="card stats-card">
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6>Total Retur</h6>
-                        <h2>{{ $stats['retur'] }}</h2>
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="stats-icon bg-warning bg-opacity-10 text-warning">
+                            <i class="bi bi-arrow-return-left"></i>
+                        </div>
                     </div>
-                    <i class="fas fa-undo fa-3x"></i>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-0 text-muted">Retur</h6>
+                        <h3 class="mb-0">{{ number_format($stats['retur']) }}</h3>
+                        <small class="text-warning">
+                            <i class="bi bi-info-circle"></i> Total Return
+                        </small>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Stats Row 3: Additional Info -->
+<!-- Stats Section: Additional Info -->
+<h5 class="fw-bold text-muted text-uppercase mb-3 mt-4" style="font-size: 12px; letter-spacing: 1px;">
+    <i class="bi bi-info-circle me-2"></i>Additional Information
+</h5>
+
+<div class="row g-4 mb-4">
+    <div class="col-xl-3 col-lg-6">
+        <div class="card stats-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="stats-icon bg-primary bg-opacity-10 text-primary">
+                            <i class="bi bi-rulers"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-0 text-muted">Total Satuan</h6>
+                        <h3 class="mb-0">{{ number_format($stats['satuan']) }}</h3>
+                        <small class="text-primary">
+                            <i class="bi bi-tag"></i> Units
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-lg-6">
+        <div class="card stats-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="stats-icon bg-info bg-opacity-10 text-info">
+                            <i class="bi bi-percent"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-0 text-muted">Total Margin</h6>
+                        <h3 class="mb-0">{{ number_format($stats['margin']) }}</h3>
+                        <small class="text-info">
+                            <i class="bi bi-graph-up"></i> Profit
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-lg-6">
+        <div class="card stats-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="stats-icon bg-success bg-opacity-10 text-success">
+                            <i class="bi bi-file-earmark-text"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-0 text-muted">Kartu Stok</h6>
+                        <h3 class="mb-0">{{ number_format($stats['kartu_stok']) }}</h3>
+                        <small class="text-success">
+                            <i class="bi bi-file-text"></i> Records
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-lg-6">
+        <div class="card stats-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="stats-icon bg-warning bg-opacity-10 text-warning">
+                            <i class="bi bi-award"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-0 text-muted">Your Role</h6>
+                        <h3 class="mb-0" style="font-size: 1.25rem;">SuperAdmin</h3>
+                        <small class="text-warning">
+                            <i class="bi bi-star-fill"></i> Full Access
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Activity Statistics Today -->
+<h5 class="fw-bold text-muted text-uppercase mb-3 mt-4" style="font-size: 12px; letter-spacing: 1px;">
+    <i class="bi bi-activity me-2"></i>Activity Statistics
+</h5>
+
+<div class="row g-4 mb-4">
+    <div class="col-xl-3 col-lg-6">
+        <div class="card stats-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="stats-icon bg-primary bg-opacity-10 text-primary">
+                            <i class="bi bi-calendar-day"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-0 text-muted">Activity Today</h6>
+                        <h3 class="mb-0">{{ number_format($stats['activity_today']) }}</h3>
+                        <small class="text-primary">
+                            <i class="bi bi-clock"></i> Real-time
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-lg-6">
+        <div class="card stats-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="stats-icon bg-info bg-opacity-10 text-info">
+                            <i class="bi bi-calendar-week"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-0 text-muted">Activity Week</h6>
+                        <h3 class="mb-0">{{ number_format($stats['activity_week']) }}</h3>
+                        <small class="text-info">
+                            <i class="bi bi-graph-up"></i> This Week
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-lg-6">
+        <div class="card stats-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="stats-icon bg-success bg-opacity-10 text-success">
+                            <i class="bi bi-calendar-month"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-0 text-muted">Activity Month</h6>
+                        <h3 class="mb-0">{{ number_format($stats['activity_month']) }}</h3>
+                        <small class="text-success">
+                            <i class="bi bi-calendar-check"></i> This Month
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-lg-6">
+        <div class="card stats-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="stats-icon bg-warning bg-opacity-10 text-warning">
+                            <i class="bi bi-bar-chart"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-0 text-muted">Total Activity</h6>
+                        <h3 class="mb-0">{{ number_format($detailStats['activity']['total']) }}</h3>
+                        <small class="text-warning">
+                            <i class="bi bi-database"></i> All Time
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts & Activity Section -->
 <div class="row g-4">
-    <div class="col-md-3">
-        <div class="stat-card card card-white shadow-sm">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Recent Activities</h5>
+                <div class="d-flex gap-2">
+                    <select class="form-select form-select-sm" id="activityFilter" style="width: auto;">
+                        <option value="all">Semua</option>
+                        <option value="Pengadaan">Pengadaan</option>
+                        <option value="Penerimaan">Penerimaan</option>
+                        <option value="Penjualan">Penjualan</option>
+                    </select>
+                </div>
+            </div>
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6>Total Satuan</h6>
-                        <h2>{{ $stats['satuan'] }}</h2>
-                    </div>
-                    <i class="fas fa-balance-scale fa-3x"></i>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="15%">Jenis</th>
+                                <th width="20%">ID Transaksi</th>
+                                <th>Deskripsi</th>
+                                <th width="15%">User</th>
+                                <th width="15%">Tanggal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($recentActivities as $activity)
+                            <tr>
+                                <td>
+                                    @if($activity->jenis_aktivitas == 'Pengadaan')
+                                        <span class="badge bg-purple">{{ $activity->jenis_aktivitas }}</span>
+                                    @elseif($activity->jenis_aktivitas == 'Penerimaan')
+                                        <span class="badge bg-cyan">{{ $activity->jenis_aktivitas }}</span>
+                                    @elseif($activity->jenis_aktivitas == 'Penjualan')
+                                        <span class="badge bg-success">{{ $activity->jenis_aktivitas }}</span>
+                                    @else
+                                        <span class="badge bg-secondary">{{ $activity->jenis_aktivitas }}</span>
+                                    @endif
+                                </td>
+                                <td><code>{{ $activity->id }}</code></td>
+                                <td>{{ $activity->deskripsi }}</td>
+                                <td>
+                                    <small class="text-muted">
+                                        <i class="bi bi-person"></i> {{ $activity->created_by ?? 'System' }}
+                                    </small>
+                                </td>
+                                <td>
+                                    <small class="text-muted">
+                                        {{ date('d M Y H:i', strtotime($activity->tanggal)) }}
+                                    </small>
+                                </td>
+                            </tr>
+                            @empty
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">
+                                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                    Belum ada aktivitas
+                                </td>
+                            </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="stat-card card card-white shadow-sm">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Today's Activity</h5>
+            </div>
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6>Total Margin</h6>
-                        <h2>{{ $stats['margin'] }}</h2>
+                <div class="activity-feed">
+                    @forelse($activityToday as $activity)
+                    <div class="activity-item">
+                        @if($activity->jenis_aktivitas == 'Pengadaan')
+                            <div class="activity-icon bg-primary bg-opacity-10 text-primary">
+                                <i class="bi bi-cart-plus"></i>
+                            </div>
+                        @elseif($activity->jenis_aktivitas == 'Penerimaan')
+                            <div class="activity-icon bg-info bg-opacity-10 text-info">
+                                <i class="bi bi-inbox"></i>
+                            </div>
+                        @elseif($activity->jenis_aktivitas == 'Penjualan')
+                            <div class="activity-icon bg-success bg-opacity-10 text-success">
+                                <i class="bi bi-cart-check"></i>
+                            </div>
+                        @else
+                            <div class="activity-icon bg-secondary bg-opacity-10 text-secondary">
+                                <i class="bi bi-activity"></i>
+                            </div>
+                        @endif
+                        <div class="activity-content">
+                            <p class="mb-1 fw-semibold">{{ $activity->deskripsi }}</p>
+                            <small class="text-muted d-block">
+                                <i class="bi bi-hash"></i> {{ $activity->id }}
+                            </small>
+                            <small class="text-muted">
+                                <i class="bi bi-clock"></i> {{ date('H:i', strtotime($activity->tanggal)) }}
+                            </small>
+                        </div>
                     </div>
-                    <i class="fas fa-percentage fa-3x"></i>
+                    @empty
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-calendar-x fs-1 d-block mb-2"></i>
+                        <small>Belum ada aktivitas hari ini</small>
+                    </div>
+                    @endforelse
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="col-md-3">
-        <div class="stat-card card card-white shadow-sm">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6>Total Kartu Stok</h6>
-                        <h2>{{ $stats['kartu_stok'] }}</h2>
-                    </div>
-                    <i class="fas fa-warehouse fa-3x"></i>
-                </div>
+        <!-- Transaction Summary Today -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Today's Summary</h5>
             </div>
-        </div>
-    </div>
-
-    <div class="col-md-3">
-        <div class="stat-card card card-crown shadow-sm">
             <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
+                    <div>
+                        <small class="text-muted d-block">Pengadaan</small>
+                        <h5 class="mb-0">{{ number_format($detailStats['activity']['pengadaan_today']) }}</h5>
+                    </div>
+                    <div class="text-end">
+                        <i class="bi bi-cart-plus fs-3 text-purple"></i>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
+                    <div>
+                        <small class="text-muted d-block">Penerimaan</small>
+                        <h5 class="mb-0">{{ number_format($detailStats['activity']['penerimaan_today']) }}</h5>
+                    </div>
+                    <div class="text-end">
+                        <i class="bi bi-inbox fs-3 text-cyan"></i>
+                    </div>
+                </div>
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h6 style="opacity: 0.85;">Role Anda</h6>
-                        <h3 class="mb-0 fw-bold">SuperAdmin</h3>
+                        <small class="text-muted d-block">Penjualan</small>
+                        <h5 class="mb-0">{{ number_format($detailStats['activity']['penjualan_today']) }}</h5>
                     </div>
-                    <i class="fas fa-crown fa-3x" style="opacity: 0.3;"></i>
+                    <div class="text-end">
+                        <i class="bi bi-cart-check fs-3 text-success"></i>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 @endsection
+
+@push('styles')
+<style>
+    /* Custom Colors */
+    .bg-purple { background-color: #8b5cf6 !important; }
+    .text-purple { color: #8b5cf6 !important; }
+    .bg-cyan { background-color: #06b6d4 !important; }
+    .text-cyan { color: #06b6d4 !important; }
+
+    /* Activity Feed */
+    .activity-feed {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .activity-item {
+        display: flex;
+        gap: 1rem;
+        align-items: start;
+    }
+
+    .activity-icon {
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.5rem;
+        flex-shrink: 0;
+    }
+
+    .activity-content p {
+        font-size: 0.9rem;
+    }
+
+    /* Stats Card Hover Effect */
+    .stats-card {
+        transition: all 0.3s ease;
+        border: none;
+        box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+    }
+
+    .stats-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+    }
+
+    .stats-icon {
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.5rem;
+        font-size: 1.5rem;
+    }
+</style>
+@endpush
+
+@push('scripts')
+<script>
+    // Activity Filter
+    document.getElementById('activityFilter')?.addEventListener('change', function() {
+        const filterValue = this.value;
+        const rows = document.querySelectorAll('tbody tr');
+        
+        rows.forEach(row => {
+            if (filterValue === 'all') {
+                row.style.display = '';
+            } else {
+                const badge = row.querySelector('.badge');
+                if (badge && badge.textContent.trim() === filterValue) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+        });
+    });
+
+    // Initialize tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+</script>
+@endpush

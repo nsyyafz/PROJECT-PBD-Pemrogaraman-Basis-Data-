@@ -10,17 +10,33 @@ class PengadaanController extends Controller
 {
     /**
      * Display a listing of pengadaan
+     * Dengan filter status
      */
-    public function index()
+    public function index(Request $request)
     {
-        $pengadaans = DB::select("
-            SELECT p.*, v.nama_vendor
-            FROM pengadaan p
-            JOIN vendor v ON p.vendor_idvendor = v.idvendor
-            ORDER BY p.timestamp DESC
-        ");
+        // Ambil filter status dari query parameter
+        $filterStatus = $request->get('status', 'all'); // default: all
         
-        return view('superadmin.pengadaan.index', compact('pengadaans'));
+        // Tentukan VIEW mana yang akan digunakan
+        $viewName = match($filterStatus) {
+            'diproses' => 'view_pengadaan_diproses',
+            'sebagian' => 'view_pengadaan_sebagian',
+            'selesai' => 'view_pengadaan_selesai',
+            default => 'view_pengadaan_all' // all
+        };
+        
+        // Query data dari VIEW
+        $pengadaans = DB::select("SELECT * FROM {$viewName}");
+        
+        // Hitung statistik untuk badge
+        $stats = [
+            'all' => DB::selectOne("SELECT COUNT(*) as total FROM view_pengadaan_all")->total,
+            'diproses' => DB::selectOne("SELECT COUNT(*) as total FROM view_pengadaan_diproses")->total,
+            'sebagian' => DB::selectOne("SELECT COUNT(*) as total FROM view_pengadaan_sebagian")->total,
+            'selesai' => DB::selectOne("SELECT COUNT(*) as total FROM view_pengadaan_selesai")->total,
+        ];
+        
+        return view('superadmin.pengadaan.index', compact('pengadaans', 'filterStatus', 'stats'));
     }
 
     /**
@@ -46,9 +62,8 @@ class PengadaanController extends Controller
     }
 
     /**
-     * API: Get Harga Barang (Call Function)
-     * INI SATU-SATUNYA API YANG DIPERLUKAN!
-     * Digunakan untuk preview harga saat user pilih barang
+     * API: Get Harga Barang
+     * Memanggil FUNCTION fn_get_harga_barang()
      */
     public function getHargaBarang(Request $request)
     {
@@ -79,13 +94,8 @@ class PengadaanController extends Controller
     }
 
     /**
-     * Store: SEMUA PERHITUNGAN DILAKUKAN DI STORED PROCEDURE!
-     * SP akan otomatis:
-     * 1. Ambil harga via fn_get_harga_barang()
-     * 2. Hitung subtotal via fn_hitung_subtotal_item()
-     * 3. Update subtotal_nilai di header (SUM dari detail)
-     * 4. Hitung PPN via fn_hitung_ppn()
-     * 5. Hitung total_nilai via fn_hitung_total_pengadaan()
+     * Store: Menggunakan Stored Procedure sp_insert_detail_pengadaan
+     * ID Manual: Ambil MAX(idpengadaan) + 1
      */
     public function store(Request $request)
     {
@@ -113,19 +123,29 @@ class PengadaanController extends Controller
             // Ambil ID user dari session
             $iduser = session('user_id') ?? 1;
             
-            // 1. Insert header pengadaan (subtotal dan total masih 0)
-            $idpengadaan = DB::table('pengadaan')->insertGetId([
-                'timestamp' => now(),
-                'user_iduser' => $iduser,
-                'status' => 'P', // P = Pending
-                'vendor_idvendor' => $request->vendor_idvendor,
-                'subtotal_nilai' => 0,
-                'ppn' => $request->ppn,
-                'total_nilai' => 0
+            // 1. Generate ID pengadaan manual: MAX(idpengadaan) + 1
+            $maxId = DB::selectOne("SELECT COALESCE(MAX(idpengadaan), 0) as max_id FROM pengadaan");
+            $idpengadaan = $maxId->max_id + 1;
+            
+            // 2. Insert header pengadaan dengan ID manual
+            // Status default: D = Diproses (belum ada penerimaan)
+            DB::insert("
+                INSERT INTO pengadaan 
+                (idpengadaan, timestamp, user_iduser, status, vendor_idvendor, subtotal_nilai, ppn, total_nilai)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ", [
+                $idpengadaan,
+                now(),
+                $iduser,
+                'D', // D = Diproses
+                $request->vendor_idvendor,
+                0,
+                $request->ppn,
+                0
             ]);
             
-            // 2. Insert detail pengadaan menggunakan STORED PROCEDURE
-            // SP AKAN OTOMATIS MENGHITUNG SEMUANYA!
+            // 3. Insert detail menggunakan STORED PROCEDURE
+            // SP akan otomatis menghitung semua nilai
             foreach ($request->barang as $item) {
                 DB::statement("CALL sp_insert_detail_pengadaan(?, ?, ?)", [
                     $idpengadaan,
@@ -150,126 +170,73 @@ class PengadaanController extends Controller
     }
 
     /**
-     * Update Status Pengadaan
-     * Status: P = Pending, A = Approved, R = Rejected
-     */
-    public function updateStatus(Request $request, string $id)
-    {
-        $request->validate([
-            'status' => 'required|in:P,A,R',
-        ]);
-        
-        DB::beginTransaction();
-        
-        try {
-            // Cek pengadaan exists
-            $pengadaan = DB::selectOne("
-                SELECT idpengadaan, status 
-                FROM pengadaan 
-                WHERE idpengadaan = ?
-            ", [$id]);
-            
-            if (!$pengadaan) {
-                throw new \Exception('Pengadaan tidak ditemukan');
-            }
-            
-            // Validasi: Tidak bisa ubah status jika sudah ada penerimaan
-            $hasPenerimaan = DB::selectOne("
-                SELECT COUNT(*) as total 
-                FROM penerimaan 
-                WHERE idpengadaan = ?
-            ", [$id]);
-            
-            if ($hasPenerimaan->total > 0 && $request->status === 'R') {
-                throw new \Exception('Tidak dapat reject pengadaan yang sudah ada penerimaan');
-            }
-            
-            // Update status
-            DB::update("
-                UPDATE pengadaan 
-                SET status = ?
-                WHERE idpengadaan = ?
-            ", [$request->status, $id]);
-            
-            DB::commit();
-            
-            $statusText = [
-                'P' => 'Pending',
-                'A' => 'Approved',
-                'R' => 'Rejected'
-            ];
-            
-            return back()->with('success', 'Status pengadaan berhasil diubah menjadi: ' . $statusText[$request->status]);
-            
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return back()->with('error', 'Gagal mengubah status: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Display the specified resource.
+     * Display the specified resource
+     * Menggunakan view_detail_pengadaan_lengkap
      */
     public function show(string $id)
     {
-        // Ambil header pengadaan
-        $pengadaan = DB::select("
-            SELECT 
-                p.*,
-                v.nama_vendor,
-                u.username as created_by,
-                DATE_FORMAT(p.timestamp, '%d-%m-%Y %H:%i') as tanggal_formatted
-            FROM pengadaan p
-            JOIN vendor v ON p.vendor_idvendor = v.idvendor
-            JOIN user u ON p.user_iduser = u.iduser
-            WHERE p.idpengadaan = ?
-        ", [$id]);
-        
-        if (empty($pengadaan)) {
-            abort(404, 'Pengadaan tidak ditemukan');
-        }
-        
-        // Ambil detail pengadaan
-        $details = DB::select("
-            SELECT 
-                dp.*,
-                b.nama as nama_barang,
-                s.nama_satuan
-            FROM detail_pengadaan dp
-            JOIN barang b ON dp.idbarang = b.idbarang
-            JOIN satuan s ON b.idsatuan = s.idsatuan
-            WHERE dp.idpengadaan = ?
-            ORDER BY dp.iddetail_pengadaan
-        ", [$id]);
-        
-        return view('superadmin.pengadaan.show', [
-            'pengadaan' => $pengadaan[0],
-            'details' => $details
-        ]);
-    }
-    /**
-     * Show the form for editing the specified pengadaan
-     * HANYA untuk status Pending (P)
-     */
-    public function edit(string $id)
-    {
-        // Cek pengadaan exists dan statusnya
+        // Ambil header pengadaan dari VIEW
         $pengadaan = DB::selectOne("
-            SELECT p.*, v.nama_vendor
-            FROM pengadaan p
-            JOIN vendor v ON p.vendor_idvendor = v.idvendor
-            WHERE p.idpengadaan = ?
+            SELECT * FROM view_pengadaan_all
+            WHERE idpengadaan = ?
         ", [$id]);
         
         if (!$pengadaan) {
             abort(404, 'Pengadaan tidak ditemukan');
         }
         
-        // VALIDASI: Hanya status Pending yang bisa di-edit
-        if ($pengadaan->status !== 'P') {
+        // Ambil detail pengadaan dari VIEW LENGKAP
+        // VIEW ini sudah include: nama barang, satuan, jumlah diterima, sisa, persentase, status per item
+        $details = DB::select("
+            SELECT * FROM view_detail_pengadaan_lengkap
+            WHERE idpengadaan = ?
+            ORDER BY iddetail_pengadaan
+        ", [$id]);
+        
+        // Ambil riwayat penerimaan jika ada
+        $penerimaans = DB::select("
+            SELECT 
+                pen.idpenerimaan,
+                pen.created_at,
+                u.username as dibuat_oleh,
+                COUNT(dpen.iddetail_penerimaan) as jumlah_item,
+                SUM(dpen.jumlah_terima) as total_qty_terima
+            FROM penerimaan pen
+            JOIN user u ON pen.iduser = u.iduser
+            LEFT JOIN detail_penerimaan dpen ON pen.idpenerimaan = dpen.idpenerimaan
+            WHERE pen.idpengadaan = ?
+            GROUP BY pen.idpenerimaan, pen.created_at, u.username
+            ORDER BY pen.created_at DESC
+        ", [$id]);
+        
+        return view('superadmin.pengadaan.show', [
+            'pengadaan' => $pengadaan,
+            'details' => $details,
+            'penerimaans' => $penerimaans
+        ]);
+    }
+
+    /**
+     * Show the form for editing the specified pengadaan
+     * HANYA untuk status Diproses (D)
+     */
+    public function edit(string $id)
+    {
+        // Cek pengadaan exists dan statusnya
+        $pengadaan = DB::selectOne("
+            SELECT * FROM view_pengadaan_all
+            WHERE idpengadaan = ?
+        ", [$id]);
+        
+        if (!$pengadaan) {
+            abort(404, 'Pengadaan tidak ditemukan');
+        }
+        
+        // VALIDASI: Hanya status Diproses yang bisa di-edit
+        if ($pengadaan->status !== 'D') {
             return redirect()
                 ->route('superadmin.pengadaan.index')
-                ->with('error', 'Hanya pengadaan dengan status Pending yang dapat diubah!');
+                ->with('error', 'Hanya pengadaan dengan status "Diproses" yang dapat diubah!');
         }
         
         // Ambil detail pengadaan yang sudah ada
@@ -334,7 +301,7 @@ class PengadaanController extends Controller
         DB::beginTransaction();
         
         try {
-            // 1. Cek status pengadaan (hanya Pending yang bisa di-update)
+            // 1. Cek status pengadaan
             $pengadaan = DB::selectOne("
                 SELECT idpengadaan, status 
                 FROM pengadaan 
@@ -345,8 +312,9 @@ class PengadaanController extends Controller
                 throw new \Exception('Pengadaan tidak ditemukan');
             }
             
-            if ($pengadaan->status !== 'P') {
-                throw new \Exception('Hanya pengadaan dengan status Pending yang dapat diubah!');
+            // VALIDASI: Hanya status Diproses yang bisa di-update
+            if ($pengadaan->status !== 'D') {
+                throw new \Exception('Hanya pengadaan dengan status "Diproses" yang dapat diubah!');
             }
             
             // 2. Update header pengadaan
@@ -388,7 +356,7 @@ class PengadaanController extends Controller
     }
 
     /**
-     * Delete pengadaan (HANYA untuk status Pending)
+     * Delete pengadaan (HANYA untuk status Diproses)
      */
     public function destroy(string $id)
     {
@@ -406,8 +374,9 @@ class PengadaanController extends Controller
                 throw new \Exception('Pengadaan tidak ditemukan');
             }
             
-            if ($pengadaan->status !== 'P') {
-                throw new \Exception('Hanya pengadaan dengan status Pending yang dapat dihapus!');
+            // VALIDASI: Hanya status Diproses yang bisa dihapus
+            if ($pengadaan->status !== 'D') {
+                throw new \Exception('Hanya pengadaan dengan status "Diproses" yang dapat dihapus!');
             }
             
             // Cek apakah sudah ada penerimaan
@@ -440,4 +409,3 @@ class PengadaanController extends Controller
         }
     }
 }
-

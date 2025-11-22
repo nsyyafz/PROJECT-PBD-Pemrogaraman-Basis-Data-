@@ -13,7 +13,7 @@ class MarginController extends Controller
      */
     public function index(Request $request)
     {
-        $filter = $request->get('status', 'all');
+        $filter = $request->get('status', 'aktif');
         
         if ($filter == 'aktif') {
             $margins = DB::select("

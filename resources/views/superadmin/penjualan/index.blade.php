@@ -1,15 +1,15 @@
 @extends('layouts.metis.app')
 
-@section('title', 'Daftar Penerimaan')
+@section('title', 'Daftar Penjualan')
 
 @php
-    $pageTitle = 'Daftar Penerimaan';
-    $pageDescription = 'Kelola data penerimaan barang';
+    $pageTitle = 'Daftar Penjualan';
+    $pageDescription = 'Kelola data penjualan barang';
 @endphp
 
 @section('page-actions')
-<a href="{{ route('superadmin.penerimaan.create') }}" class="btn btn-primary btn-sm">
-    <i class="bi bi-plus-circle me-1"></i> Buat Penerimaan Baru
+<a href="{{ route('superadmin.penjualan.create') }}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-circle me-1"></i> Buat Penjualan Baru
 </a>
 @endsection
 
@@ -33,9 +33,9 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center py-2">
         <h6 class="card-title mb-0">
-            <i class="bi bi-truck me-2"></i>Data Penerimaan Barang
+            <i class="bi bi-cart-check me-2"></i>Data Penjualan
         </h6>
-        <span class="badge bg-primary">{{ $stats['total'] ?? count($penerimaans) }} transaksi</span>
+        <span class="badge bg-primary">{{ count($penjualans) }} transaksi</span>
     </div>
     
     <div class="card-body p-0">
@@ -45,21 +45,22 @@
                     <tr>
                         <th style="width: 45px;">ID</th>
                         <th style="width: 85px;">Tanggal</th>
-                        <th style="width: 80px;">ID Pengadaan</th>
-                        <th style="width: 160px;">Vendor</th>
-                        <th style="width: 100px;">Dibuat Oleh</th>
+                        <th style="width: 100px;">User</th>
                         <th style="width: 80px;" class="text-center">Jumlah Item</th>
                         <th style="width: 90px;" class="text-center">Total Qty</th>
-                        <th style="width: 120px;" class="text-end">Total Nilai</th>
-                        <th style="width: 85px;" class="text-center">Status</th>
+                        <th style="width: 110px;" class="text-end">Subtotal</th>
+                        <th style="width: 50px;" class="text-center">PPN</th>
+                        <th style="width: 110px;" class="text-end">Total</th>
+                        <th style="width: 80px;" class="text-center">Margin</th>
+                        <th style="width: 110px;" class="text-end">Keuntungan</th>
                         <th style="width: 100px;" class="text-center">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse($penerimaans as $item)
+                    @forelse($penjualans as $item)
                     <tr>
                         <td>
-                            <strong class="text-info">#{{ $item->idpenerimaan }}</strong>
+                            <strong class="text-success">#{{ $item->idpenjualan }}</strong>
                         </td>
                         <td>
                             <div style="font-size: 0.7rem;">
@@ -69,41 +70,34 @@
                                 <span class="text-muted"><i class="bi bi-clock"></i> {{ date('H:i', strtotime($item->created_at)) }}</span>
                             </div>
                         </td>
-                        <td>
-                            <a href="{{ route('superadmin.pengadaan.show', $item->idpengadaan) }}" 
-                               class="text-primary fw-bold"
-                               data-bs-toggle="tooltip"
-                               title="Lihat Pengadaan">
-                                #{{ $item->idpengadaan }}
-                            </a>
-                        </td>
-                        <td>
-                            <div style="font-size: 0.75rem;">
-                                <strong>{{ $item->nama_vendor }}</strong>
-                            </div>
-                            <small class="text-muted" style="font-size: 0.65rem;">{{ $item->badan_hukum }}</small>
-                        </td>
                         <td style="font-size: 0.75rem;">
-                            <i class="bi bi-person-circle"></i> {{ $item->created_by }}
+                            <i class="bi bi-person-circle"></i> {{ $item->username }}
                         </td>
                         <td class="text-center">
                             <span class="badge bg-info" style="font-size: 0.65rem;">{{ $item->jumlah_item ?? 0 }}</span>
                         </td>
                         <td class="text-center">
-                            <span class="badge bg-success" style="font-size: 0.65rem;">{{ $item->total_qty_terima ?? 0 }}</span>
+                            <span class="badge bg-success" style="font-size: 0.65rem;">{{ $item->total_qty ?? 0 }}</span>
                         </td>
-                        <td class="text-end" style="font-size: 0.75rem;">
-                            <strong class="text-success">Rp {{ number_format($item->total_nilai_terima ?? 0, 0, ',', '.') }}</strong>
+                        <td class="text-end" style="font-size: 0.7rem;">
+                            Rp {{ number_format($item->subtotal_nilai, 0, ',', '.') }}
                         </td>
                         <td class="text-center">
-                            <span class="badge bg-success" style="font-size: 0.65rem;">
-                                <i class="bi bi-check-circle"></i> {{ $item->status_text }}
-                            </span>
+                            <span class="badge bg-light text-dark" style="font-size: 0.65rem;">{{ $item->ppn }}%</span>
+                        </td>
+                        <td class="text-end">
+                            <strong class="text-success" style="font-size: 0.75rem;">Rp {{ number_format($item->total_nilai, 0, ',', '.') }}</strong>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-primary" style="font-size: 0.65rem;">{{ $item->margin_persen }}%</span>
+                        </td>
+                        <td class="text-end">
+                            <strong class="text-primary" style="font-size: 0.75rem;">Rp {{ number_format($item->total_keuntungan ?? 0, 0, ',', '.') }}</strong>
                         </td>
                         <td class="text-center">
                             <div class="btn-group btn-group-sm" role="group">
                                 <!-- Detail -->
-                                <a href="{{ route('superadmin.penerimaan.show', $item->idpenerimaan) }}" 
+                                <a href="{{ route('superadmin.penjualan.show', $item->idpenjualan) }}" 
                                    class="btn btn-info btn-sm"
                                    data-bs-toggle="tooltip" 
                                    title="Detail">
@@ -115,14 +109,14 @@
                                         class="btn btn-danger btn-sm"
                                         data-bs-toggle="tooltip" 
                                         title="Hapus"
-                                        onclick="confirmDelete({{ $item->idpenerimaan }}, '#{{ $item->idpenerimaan }}')">
+                                        onclick="confirmDelete({{ $item->idpenjualan }}, '#{{ $item->idpenjualan }}')">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </div>
                             
                             <!-- Hidden Delete Form -->
-                            <form id="delete-form-{{ $item->idpenerimaan }}" 
-                                  action="{{ route('superadmin.penerimaan.destroy', $item->idpenerimaan) }}" 
+                            <form id="delete-form-{{ $item->idpenjualan }}" 
+                                  action="{{ route('superadmin.penjualan.destroy', $item->idpenjualan) }}" 
                                   method="POST" 
                                   class="d-none">
                                 @csrf
@@ -132,12 +126,12 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="10" class="text-center py-5">
+                        <td colspan="11" class="text-center py-5">
                             <div class="text-muted">
                                 <i class="bi bi-inbox display-1 opacity-25"></i>
-                                <p class="mt-3 mb-3">Belum ada data penerimaan</p>
-                                <a href="{{ route('superadmin.penerimaan.create') }}" class="btn btn-primary btn-sm">
-                                    <i class="bi bi-plus-circle me-1"></i> Buat Penerimaan Pertama
+                                <p class="mt-3 mb-3">Belum ada data penjualan</p>
+                                <a href="{{ route('superadmin.penjualan.create') }}" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-plus-circle me-1"></i> Buat Penjualan Pertama
                                 </a>
                             </div>
                         </td>
@@ -154,7 +148,7 @@
 <script>
 // Konfirmasi hapus
 function confirmDelete(id, nama) {
-    if (confirm('Apakah Anda yakin ingin menghapus penerimaan "' + nama + '"?\n\nPenerimaan ID: ' + id + '\n\nStok akan dikembalikan dan status pengadaan akan diupdate!')) {
+    if (confirm('Apakah Anda yakin ingin menghapus penjualan "' + nama + '"?\n\nPenjualan ID: ' + id + '\n\nStok akan dikembalikan!')) {
         document.getElementById('delete-form-' + id).submit();
     }
 }

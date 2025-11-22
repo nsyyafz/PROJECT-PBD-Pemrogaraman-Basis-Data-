@@ -9,94 +9,57 @@ use App\Http\Controllers\Controller;
 class PenerimaanController extends Controller
 {
     /**
-     * Display a listing (tanpa view, langsung dari tabel)
+     * Display a listing menggunakan view_penerimaan_all
      */
     public function index(Request $request)
     {
-        $filter = $request->get('status', 'all');
+        // Query data dari VIEW
+        $penerimaans = DB::select("SELECT * FROM view_penerimaan_all ORDER BY created_at DESC");
         
-        // Query langsung dari tabel dengan JOIN
-        if ($filter == 'all') {
-            $penerimaans = DB::select("
-                SELECT 
-                    pen.idpenerimaan,
-                    pen.created_at AS tanggal,
-                    pen.status,
-                    pen.idpengadaan,
-                    u.username,
-                    v.nama_vendor
-                FROM penerimaan pen
-                JOIN user u ON pen.iduser = u.iduser
-                JOIN pengadaan p ON pen.idpengadaan = p.idpengadaan
-                JOIN vendor v ON p.vendor_idvendor = v.idvendor
-                ORDER BY pen.created_at DESC
-            ");
-        } else {
-            // Filter berdasarkan status (P, A, C)
-            $statusCode = match($filter) {
-                'pending' => 'P',
-                'approved' => 'A',
-                'completed' => 'C',
-                default => 'P'
-            };
-            
-            $penerimaans = DB::select("
-                SELECT 
-                    pen.idpenerimaan,
-                    pen.created_at AS tanggal,
-                    pen.status,
-                    pen.idpengadaan,
-                    u.username,
-                    v.nama_vendor
-                FROM penerimaan pen
-                JOIN user u ON pen.iduser = u.iduser
-                JOIN pengadaan p ON pen.idpengadaan = p.idpengadaan
-                JOIN vendor v ON p.vendor_idvendor = v.idvendor
-                WHERE pen.status = ?
-                ORDER BY pen.created_at DESC
-            ", [$statusCode]);
-        }
+        // Hitung statistik (opsional)
+        $stats = [
+            'total' => count($penerimaans),
+        ];
         
-        return view('superadmin.penerimaan.index', compact('penerimaans', 'filter'));
+        return view('superadmin.penerimaan.index', compact('penerimaans', 'stats'));
     }
 
     /**
      * Display the specified resource (DETAIL LENGKAP)
+     * Menggunakan view_detail_penerimaan_all
      */
     public function show(string $id)
     {
-        // Ambil data dari view_detail_penerimaan
+        // Ambil header dari view_penerimaan_all
+        $penerimaan = DB::selectOne("
+            SELECT * FROM view_penerimaan_all
+            WHERE idpenerimaan = ?
+        ", [$id]);
+        
+        if (!$penerimaan) {
+            abort(404, 'Penerimaan tidak ditemukan');
+        }
+        
+        // Ambil detail dari view_detail_penerimaan_all
         $details = DB::select("
-            SELECT * FROM view_detail_penerimaan
+            SELECT * FROM view_detail_penerimaan_all
             WHERE idpenerimaan = ?
             ORDER BY iddetail_penerimaan ASC
         ", [$id]);
         
-        if (empty($details)) {
-            abort(404, 'Penerimaan tidak ditemukan');
-        }
-        
-        // Data header penerimaan
-        $penerimaan = $details[0];
-        
-        // Data detail barang
-        $detail_barang = $details;
-        
-        return view('superadmin.penerimaan.show', compact('penerimaan', 'detail_barang'));
+        return view('superadmin.penerimaan.show', compact('penerimaan', 'details'));
     }
 
     /**
      * Show the form for creating a new resource.
+     * Menggunakan view_pengadaan_belum_selesai
      */
     public function create(Request $request)
     {
-        // Ambil pengadaan yang sudah approved tapi belum selesai diterima
+        // Ambil pengadaan yang belum selesai (status D atau P)
         $pengadaans = DB::select("
-            SELECT p.idpengadaan, p.timestamp, v.nama_vendor, p.total_nilai
-            FROM pengadaan p
-            JOIN vendor v ON p.vendor_idvendor = v.idvendor
-            WHERE p.status = 'A'
-            ORDER BY p.timestamp DESC
+            SELECT * FROM view_pengadaan_belum_selesai
+            ORDER BY timestamp DESC
         ");
         
         // Ambil user dari session
@@ -107,19 +70,35 @@ class PenerimaanController extends Controller
         );
         
         return view('superadmin.penerimaan.create', compact('pengadaans', 'currentUser'));
-}
+    }
 
     /**
-     * AJAX: Get Preview Detail Pengadaan
-     * Dipanggil saat user pilih pengadaan di form
+     * AJAX: Get Preview Detail Pengadaan untuk dipilih
+     * Menggunakan view_detail_pengadaan_lengkap
      */
     public function getDetailPengadaan(Request $request)
     {
         $idpengadaan = $request->idpengadaan;
         
         try {
-            // CALL SP PREVIEW (hanya SELECT, tidak insert!)
-            $details = DB::select("CALL sp_preview_detail_pengadaan(?)", [$idpengadaan]);
+            // Ambil detail dari VIEW (sudah include sisa belum terima)
+            $details = DB::select("
+                SELECT 
+                    idbarang,
+                    nama_barang,
+                    nama_satuan,
+                    jenis,
+                    harga_satuan,
+                    jumlah_pesan,
+                    jumlah_diterima,
+                    sisa_belum_terima,
+                    persentase_diterima,
+                    status_item
+                FROM view_detail_pengadaan_lengkap
+                WHERE idpengadaan = ?
+                AND sisa_belum_terima > 0
+                ORDER BY iddetail_pengadaan
+            ", [$idpengadaan]);
             
             return response()->json([
                 'success' => true,
@@ -136,50 +115,70 @@ class PenerimaanController extends Controller
 
     /**
      * Store a newly created resource in storage.
-     * MENGGUNAKAN SP DAN TRIGGER!
+     * MENGGUNAKAN SP sp_insert_detail_penerimaan
+     * TRIGGER otomatis: update stok + update status pengadaan
      */
-    public function store(Request $request)
+   public function store(Request $request)
     {
         $request->validate([
             'idpengadaan' => 'required|exists:pengadaan,idpengadaan',
             'barang' => 'required|array|min:1',
             'barang.*.idbarang' => 'required|exists:barang,idbarang',
-            'barang.*.jumlah_terima' => 'required|numeric|min:1',
+            'barang.*.jumlah_terima' => 'required|numeric|min:0', // ✅ UBAH: min:0 (boleh 0)
+        ], [
+            'idpengadaan.required' => 'Pengadaan harus dipilih',
+            'idpengadaan.exists' => 'Pengadaan tidak valid',
+            'barang.required' => 'Minimal 1 barang harus ditambahkan',
+            'barang.*.idbarang.required' => 'ID Barang tidak valid',
+            'barang.*.idbarang.exists' => 'Barang tidak ditemukan',
+            'barang.*.jumlah_terima.required' => 'Jumlah terima harus diisi',
+            'barang.*.jumlah_terima.min' => 'Jumlah terima minimal 0', // ✅ UBAH
         ]);
         
         DB::beginTransaction();
         
         try {
-            // Ambil user dari session (bukan auth()->user())
-            $iduser = $request->session()->get('user_id');
+            // Ambil user dari session
+            $iduser = $request->session()->get('user_id') ?? 1;
             
-            // 1. Insert header penerimaan (manual)
+            // 1. Generate ID penerimaan manual: MAX(idpenerimaan) + 1
+            $maxId = DB::selectOne("SELECT COALESCE(MAX(idpenerimaan), 0) as max_id FROM penerimaan");
+            $idpenerimaan = $maxId->max_id + 1;
+            
+            // 2. Insert header penerimaan dengan ID manual
             DB::insert("
-                INSERT INTO penerimaan (created_at, status, iduser, idpengadaan)
-                VALUES (NOW(), 'P', ?, ?)
-            ", [$iduser, $request->idpengadaan]);
+                INSERT INTO penerimaan (idpenerimaan, created_at, status, iduser, idpengadaan)
+                VALUES (?, NOW(), 'S', ?, ?)
+            ", [$idpenerimaan, $iduser, $request->idpengadaan]);
             
-            $idpenerimaan = DB::getPdo()->lastInsertId();
-            
-            // 2. Insert detail menggunakan STORED PROCEDURE
-            // TRIGGER otomatis update stok!
+            // 3. Insert detail menggunakan STORED PROCEDURE
+            // ✅ SKIP barang yang jumlah_terima = 0
+            $itemDiterima = 0;
             foreach ($request->barang as $item) {
-                // CALL SP INSERT DETAIL PENERIMAAN
+                // Skip jika jumlah 0
+                if ($item['jumlah_terima'] <= 0) {
+                    continue;
+                }
+                
                 DB::statement("CALL sp_insert_detail_penerimaan(?, ?, ?)", [
                     $idpenerimaan,
                     $item['idbarang'],
                     $item['jumlah_terima']
                 ]);
                 
-                // NOTE: Tidak perlu update stok manual!
-                // Trigger sudah otomatis insert ke kartu_stok!
+                $itemDiterima++;
+            }
+            
+            // ✅ VALIDASI: Minimal 1 barang yang jumlahnya > 0
+            if ($itemDiterima === 0) {
+                throw new \Exception('Minimal 1 barang harus memiliki jumlah terima > 0');
             }
             
             DB::commit();
             
             return redirect()
                 ->route('superadmin.penerimaan.show', $idpenerimaan)
-                ->with('success', 'Penerimaan berhasil dibuat dan stok otomatis terupdate!');
+                ->with('success', 'Penerimaan berhasil dibuat! Stok dan status pengadaan otomatis terupdate.');
                 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -190,56 +189,37 @@ class PenerimaanController extends Controller
     }
 
     /**
-     * Update status penerimaan
-     */
-    public function updateStatus(Request $request, string $id)
-    {
-        $request->validate([
-            'status' => 'required|in:P,A,C'
-        ]);
-        
-        try {
-            DB::update("
-                UPDATE penerimaan 
-                SET status = ?
-                WHERE idpenerimaan = ?
-            ", [$request->status, $id]);
-            
-            $statusText = match($request->status) {
-                'P' => 'Pending',
-                'A' => 'Approved',
-                'C' => 'Completed',
-            };
-            
-            return back()->with('success', "Status penerimaan berhasil diubah menjadi {$statusText}");
-            
-        } catch (\Exception $e) {
-            return back()->with('error', 'Gagal mengubah status: ' . $e->getMessage());
-        }
-    }
-
-    /**
      * Remove the specified resource from storage.
+     * Harus hapus kartu_stok dulu sebelum hapus penerimaan
      */
     public function destroy(string $id)
     {
         DB::beginTransaction();
         
         try {
-            // Cek apakah sudah ada retur
-            $hasRetur = DB::select("
+            // 1. Cek apakah penerimaan ada
+            $penerimaan = DB::selectOne("
+                SELECT idpenerimaan, idpengadaan 
+                FROM penerimaan 
+                WHERE idpenerimaan = ?
+            ", [$id]);
+            
+            if (!$penerimaan) {
+                throw new \Exception('Penerimaan tidak ditemukan');
+            }
+            
+            // 2. Cek apakah sudah ada retur
+            $hasRetur = DB::selectOne("
                 SELECT COUNT(*) as total 
                 FROM retur 
                 WHERE idpenerimaan = ?
             ", [$id]);
             
-            if ($hasRetur[0]->total > 0) {
-                return redirect()
-                    ->route('superadmin.penerimaan.index')
-                    ->with('error', 'Penerimaan tidak dapat dihapus karena sudah ada retur.');
+            if ($hasRetur->total > 0) {
+                throw new \Exception('Penerimaan tidak dapat dihapus karena sudah ada retur!');
             }
             
-            // PENTING: Hapus kartu_stok dulu (karena foreign key)
+            // 3. PENTING: Hapus kartu_stok dulu (foreign key)
             // Jenis transaksi 'T' = Terima/Penerimaan
             DB::delete("
                 DELETE FROM kartu_stok 
@@ -247,22 +227,60 @@ class PenerimaanController extends Controller
                 AND idtransaksi = ?
             ", [$id]);
             
-            // Hapus detail penerimaan
+            // 4. Hapus detail penerimaan
             DB::delete("DELETE FROM detail_penerimaan WHERE idpenerimaan = ?", [$id]);
             
-            // Hapus penerimaan
+            // 5. Hapus header penerimaan
             DB::delete("DELETE FROM penerimaan WHERE idpenerimaan = ?", [$id]);
+            
+            // 6. Update status pengadaan kembali
+            // Cek apakah masih ada penerimaan lain untuk pengadaan ini
+            $sisaPenerimaan = DB::selectOne("
+                SELECT COUNT(*) as total 
+                FROM penerimaan 
+                WHERE idpengadaan = ?
+            ", [$penerimaan->idpengadaan]);
+            
+            if ($sisaPenerimaan->total == 0) {
+                // Tidak ada penerimaan lagi → status kembali ke Diproses
+                DB::update("
+                    UPDATE pengadaan 
+                    SET status = 'D' 
+                    WHERE idpengadaan = ?
+                ", [$penerimaan->idpengadaan]);
+            } else {
+                // Masih ada penerimaan lain → recalculate status
+                // Cek apakah masih ada yang belum lengkap
+                $adaSisa = DB::selectOne("
+                    SELECT COUNT(*) as total
+                    FROM detail_pengadaan dp
+                    WHERE dp.idpengadaan = ?
+                    AND dp.jumlah > COALESCE(
+                        (SELECT SUM(dpen.jumlah_terima)
+                         FROM penerimaan pen
+                         JOIN detail_penerimaan dpen ON pen.idpenerimaan = dpen.idpenerimaan
+                         WHERE pen.idpengadaan = ?
+                         AND dpen.idbarang = dp.idbarang), 0
+                    )
+                ", [$penerimaan->idpengadaan, $penerimaan->idpengadaan]);
+                
+                $newStatus = $adaSisa->total > 0 ? 'P' : 'S';
+                DB::update("
+                    UPDATE pengadaan 
+                    SET status = ? 
+                    WHERE idpengadaan = ?
+                ", [$newStatus, $penerimaan->idpengadaan]);
+            }
             
             DB::commit();
             
             return redirect()
                 ->route('superadmin.penerimaan.index')
-                ->with('success', 'Penerimaan berhasil dihapus');
+                ->with('success', 'Penerimaan berhasil dihapus dan status pengadaan diupdate!');
                 
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()
-                ->route('superadmin.penerimaan.index')
+            return back()
                 ->with('error', 'Gagal menghapus penerimaan: ' . $e->getMessage());
         }
     }
