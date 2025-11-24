@@ -1,10 +1,10 @@
 @extends('layouts.metis.app')
 
-@section('title', 'Tambah Vendor')
+@section('title', 'Edit Vendor')
 
 @php
-    $pageTitle = 'Tambah Vendor';
-    $pageDescription = 'Tambah data vendor supplier baru';
+    $pageTitle = 'Edit Vendor';
+    $pageDescription = 'Edit data vendor supplier';
 @endphp
 
 @section('page-actions')
@@ -19,13 +19,14 @@
         <div class="card">
             <div class="card-header">
                 <h5 class="card-title mb-0">
-                    <i class="bi bi-plus-circle me-2"></i>Form Tambah Vendor
+                    <i class="bi bi-pencil-square me-2"></i>Form Edit Vendor
                 </h5>
             </div>
             
             <div class="card-body">
-                <form action="{{ route('superadmin.vendor.store') }}" method="POST">
+                <form action="{{ route('superadmin.vendor.update', $vendor->idvendor) }}" method="POST">
                     @csrf
+                    @method('PUT')
                     
                     <div class="row">
                         <!-- Nama Vendor -->
@@ -41,7 +42,7 @@
                                        class="form-control @error('nama_vendor') is-invalid @enderror" 
                                        id="nama_vendor" 
                                        name="nama_vendor" 
-                                       value="{{ old('nama_vendor') }}"
+                                       value="{{ old('nama_vendor', $vendor->nama_vendor) }}"
                                        placeholder="Contoh: PT Maju Sejahtera"
                                        maxlength="100"
                                        required>
@@ -53,7 +54,7 @@
                         </div>
                         
                         <!-- Badan Hukum -->
-                        <div class="col-md-6 mb-4">
+                        <div class="col-md-6 mb-3">
                             <label for="badan_hukum" class="form-label">
                                 Badan Hukum <span class="text-danger">*</span>
                             </label>
@@ -62,20 +63,41 @@
                                     name="badan_hukum" 
                                     required>
                                 <option value="">-- Pilih Badan Hukum --</option>
-                                <option value="P" {{ old('badan_hukum') == 'P' ? 'selected' : '' }}>PT (Perseroan Terbatas)</option>
-                                <option value="C" {{ old('badan_hukum') == 'C' ? 'selected' : '' }}>CV (Commanditaire Vennootschap)</option>
-                                <option value="U" {{ old('badan_hukum') == 'U' ? 'selected' : '' }}>UD (Usaha Dagang)</option>
+                                <option value="P" {{ old('badan_hukum', $vendor->badan_hukum) == 'P' ? 'selected' : '' }}>PT (Perseroan Terbatas)</option>
+                                <option value="C" {{ old('badan_hukum', $vendor->badan_hukum) == 'C' ? 'selected' : '' }}>CV (Commanditaire Vennootschap)</option>
+                                <option value="U" {{ old('badan_hukum', $vendor->badan_hukum) == 'U' ? 'selected' : '' }}>UD (Usaha Dagang)</option>
                             </select>
                             @error('badan_hukum')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        
+                        <!-- Status -->
+                        <div class="col-md-6 mb-4">
+                            <label for="status" class="form-label">
+                                Status <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select @error('status') is-invalid @enderror" 
+                                    id="status" 
+                                    name="status" 
+                                    required>
+                                <option value="A" {{ old('status', $vendor->status ?? 'A') == 'A' ? 'selected' : '' }}>
+                                    Aktif
+                                </option>
+                                <option value="N" {{ old('status', $vendor->status ?? 'A') == 'N' ? 'selected' : '' }}>
+                                    Nonaktif
+                                </option>
+                            </select>
+                            @error('status')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
                     </div>
                     
                     <!-- Info -->
-                    <div class="alert alert-info mb-4">
-                        <i class="bi bi-info-circle me-2"></i>
-                        <strong>Catatan:</strong> Vendor baru akan otomatis berstatus <strong>Aktif</strong>
+                    <div class="alert alert-warning mb-4">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <strong>Perhatian:</strong> Menonaktifkan vendor akan membuatnya tidak muncul di daftar vendor aktif
                     </div>
                     
                     <!-- Buttons -->
@@ -84,7 +106,7 @@
                             <i class="bi bi-x-circle me-1"></i> Batal
                         </a>
                         <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-save me-1"></i> Simpan
+                            <i class="bi bi-save me-1"></i> Update
                         </button>
                     </div>
                 </form>
