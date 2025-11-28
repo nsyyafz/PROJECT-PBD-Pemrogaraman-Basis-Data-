@@ -89,7 +89,7 @@
                             <strong class="text-success" style="font-size: 0.75rem;">Rp {{ number_format($item->total_nilai, 0, ',', '.') }}</strong>
                         </td>
                         <td class="text-center">
-                            <span class="badge bg-primary" style="font-size: 0.65rem;">{{ $item->margin_persen }}%</span>
+                            <span class="badge bg-primary" style="font-size: 0.65rem;">{{ number_format($item->margin_persen * 100, 0) }}%</span>
                         </td>
                         <td class="text-end">
                             <strong class="text-primary" style="font-size: 0.75rem;">Rp {{ number_format($item->total_keuntungan ?? 0, 0, ',', '.') }}</strong>

@@ -168,7 +168,7 @@
                     <button type="submit" class="btn btn-primary btn-sm">
                         <i class="bi bi-save me-1"></i> Simpan Pengadaan
                     </button>
-                    <a href="{{ route('superadmin.pengadaan.index') }}" class="btn btn-secondary btn-sm">
+                    <a href="{{ route('superadmin.pengadaan.show') }}" class="btn btn-secondary btn-sm">
                         <i class="bi bi-x-circle me-1"></i> Batal
                     </a>
                 </div>

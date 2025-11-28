@@ -90,7 +90,7 @@
                         <td>
                             <span class="badge bg-warning text-dark" style="font-size: 14px; padding: 8px 16px;">
                                 <i class="bi bi-percent"></i> 
-                                <strong>{{ number_format($margin->persen * 100, 2) }}%</strong>
+                                <strong>{{ number_format($margin->persen * 100, 0) }}%</strong>
                             </span>
                         </td>
                         <td>

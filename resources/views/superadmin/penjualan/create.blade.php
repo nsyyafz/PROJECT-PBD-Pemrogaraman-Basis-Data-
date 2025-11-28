@@ -68,7 +68,7 @@
                     <label class="form-label form-label-sm">
                         Margin Aktif <span class="badge bg-info" style="font-size: 0.6rem;">INFO</span>
                     </label>
-                    <input type="text" class="form-control form-control-sm" value="{{ $marginAktif->persen ?? 0 }}%" readonly>
+                    <input type="text" class="form-control form-control-sm" value="{{ number_format(($marginAktif->persen ?? 0) * 100, 0) }}%" readonly>
                 </div>
 
                 <!-- PPN (Fixed) -->
@@ -247,7 +247,7 @@ function attachEventListeners(rowId) {
         const stok = parseInt(selectedOption.dataset.stok) || 0;
         
         // Hitung harga jual (harga modal + margin)
-        const hargaJual = Math.floor(hargaModal * (1 + marginPersen / 100));
+        const hargaJual = Math.floor(hargaModal * (1 + marginPersen));
         
         document.querySelector(`.stok-display[data-row="${rowId}"]`).textContent = stok;
         document.querySelector(`.harga-display[data-row="${rowId}"]`).value = formatRupiah(hargaJual);
