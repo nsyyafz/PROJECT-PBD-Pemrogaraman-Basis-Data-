@@ -157,7 +157,7 @@ class PengadaanController extends Controller
             DB::commit();
             
             return redirect()
-                ->route('superadmin.pengadaan.index')
+                ->route('superadmin.pengadaan.show', $idpengadaan)
                 ->with('success', 'Pengadaan berhasil dibuat dengan ID: ' . $idpengadaan);
                 
         } catch (\Exception $e) {

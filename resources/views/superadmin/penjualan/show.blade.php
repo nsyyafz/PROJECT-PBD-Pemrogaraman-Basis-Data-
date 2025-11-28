@@ -57,7 +57,7 @@
             <div class="col-md-2">
                 <label class="form-label form-label-sm text-muted mb-1">Margin Penjualan</label>
                 <div>
-                    <span class="badge bg-primary" style="font-size: 0.9rem;">{{ $penjualan->margin_persen }}%</span>
+                    <span class="badge bg-primary" style="font-size: 0.65rem;">{{ number_format($penjualan->margin_persen * 100, 0) }}%</span>
                 </div>
             </div>
 
